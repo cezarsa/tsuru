@@ -134,7 +134,7 @@ func (r *fusisRouter) AddRoute(name string, address *url.URL) error {
 		host = address.Host
 		port = "80"
 	}
-	portInt, _ := strconv.ParseInt(port, 10, 16)
+	portInt, _ := strconv.ParseUint(port, 10, 16)
 	data := map[string]interface{}{
 		"Name":       r.routeName(backendName, address),
 		"Host":       host,
