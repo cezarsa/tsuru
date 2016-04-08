@@ -136,10 +136,11 @@ func (r *fusisRouter) AddRoute(name string, address *url.URL) error {
 	}
 	portInt, _ := strconv.ParseInt(port, 10, 16)
 	data := map[string]interface{}{
-		"Name": r.routeName(backendName, address),
-		"Host": host,
-		"Port": portInt,
-		"Mode": r.mode,
+		"Name":       r.routeName(backendName, address),
+		"Host":       host,
+		"Port":       portInt,
+		"Mode":       r.mode,
+		"service_id": backendName,
 	}
 	rsp, err := r.doRequest("POST", fmt.Sprintf("/services/%s/destinations", backendName), data)
 	if err != nil {
