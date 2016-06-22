@@ -388,34 +388,42 @@ func (s *RouterSuite) TestSwapTwice(c *check.C) {
 }
 
 func (s *RouterSuite) TestRouteAddDupCName(c *check.C) {
+	cnameRouter, ok := s.Router.(router.CNameRouter)
+	if !ok {
+		c.Skip(fmt.Sprintf("%T does not implement CNameRouter", s.Router))
+	}
 	name := "backend1"
-	err := s.Router.AddBackend(name)
+	err := cnameRouter.AddBackend(name)
 	c.Assert(err, check.IsNil)
 	addr1, err := url.Parse("http://10.10.10.10:8080")
 	c.Assert(err, check.IsNil)
-	err = s.Router.AddRoute(name, addr1)
+	err = cnameRouter.AddRoute(name, addr1)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.Equals, router.ErrCNameExists)
-	err = s.Router.RemoveBackend(name)
+	err = cnameRouter.RemoveBackend(name)
 	c.Assert(err, check.IsNil)
 }
 
 func (s *RouterSuite) TestCNames(c *check.C) {
+	cnameRouter, ok := s.Router.(router.CNameRouter)
+	if !ok {
+		c.Skip(fmt.Sprintf("%T does not implement CNameRouter", s.Router))
+	}
 	name := "backend1"
-	err := s.Router.AddBackend(name)
+	err := cnameRouter.AddBackend(name)
 	c.Assert(err, check.IsNil)
 	addr1, err := url.Parse("http://10.10.10.10:8080")
 	c.Assert(err, check.IsNil)
-	err = s.Router.AddRoute(name, addr1)
+	err = cnameRouter.AddRoute(name, addr1)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host2.com", name)
+	err = cnameRouter.SetCName("my.host2.com", name)
 	c.Assert(err, check.IsNil)
-	cnames, err := s.Router.CNames(name)
+	cnames, err := cnameRouter.CNames(name)
 	url1, err := url.Parse("my.host.com")
 	c.Assert(err, check.IsNil)
 	url2, err := url.Parse("my.host2.com")
@@ -424,72 +432,88 @@ func (s *RouterSuite) TestCNames(c *check.C) {
 	expected := []*url.URL{url1, url2}
 	sort.Sort(URLList(cnames))
 	c.Assert(cnames, check.DeepEquals, expected)
-	err = s.Router.UnsetCName("my.host.com", name)
+	err = cnameRouter.UnsetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.UnsetCName("my.host.com", name)
+	err = cnameRouter.UnsetCName("my.host.com", name)
 	c.Assert(err, check.Equals, router.ErrCNameNotFound)
-	err = s.Router.RemoveBackend(name)
+	err = cnameRouter.RemoveBackend(name)
 	c.Assert(err, check.IsNil)
 }
 
 func (s *RouterSuite) TestSetUnsetCName(c *check.C) {
+	cnameRouter, ok := s.Router.(router.CNameRouter)
+	if !ok {
+		c.Skip(fmt.Sprintf("%T does not implement CNameRouter", s.Router))
+	}
 	name := "backend1"
-	err := s.Router.AddBackend(name)
+	err := cnameRouter.AddBackend(name)
 	c.Assert(err, check.IsNil)
 	addr1, err := url.Parse("http://10.10.10.10:8080")
 	c.Assert(err, check.IsNil)
-	err = s.Router.AddRoute(name, addr1)
+	err = cnameRouter.AddRoute(name, addr1)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.UnsetCName("my.host.com", name)
+	err = cnameRouter.UnsetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.UnsetCName("my.host.com", name)
+	err = cnameRouter.UnsetCName("my.host.com", name)
 	c.Assert(err, check.Equals, router.ErrCNameNotFound)
-	err = s.Router.RemoveBackend(name)
+	err = cnameRouter.RemoveBackend(name)
 	c.Assert(err, check.IsNil)
 }
 
 func (s *RouterSuite) TestSetCNameInvalidBackend(c *check.C) {
-	err := s.Router.SetCName("my.cname", "backend1")
+	cnameRouter, ok := s.Router.(router.CNameRouter)
+	if !ok {
+		c.Skip(fmt.Sprintf("%T does not implement CNameRouter", s.Router))
+	}
+	err := cnameRouter.SetCName("my.cname", "backend1")
 	c.Assert(err, check.Equals, router.ErrBackendNotFound)
 }
 
 func (s *RouterSuite) TestSetCNameSubdomainError(c *check.C) {
+	cnameRouter, ok := s.Router.(router.CNameRouter)
+	if !ok {
+		c.Skip(fmt.Sprintf("%T does not implement CNameRouter", s.Router))
+	}
 	name := "backend1"
-	err := s.Router.AddBackend(name)
+	err := cnameRouter.AddBackend(name)
 	c.Assert(err, check.IsNil)
 	addr1, err := url.Parse("http://10.10.10.10:8080")
 	c.Assert(err, check.IsNil)
-	err = s.Router.AddRoute(name, addr1)
+	err = cnameRouter.AddRoute(name, addr1)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	addr, err := s.Router.Addr(name)
+	addr, err := cnameRouter.Addr(name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("sub."+addr, name)
+	err = cnameRouter.SetCName("sub."+addr, name)
 	c.Assert(err, check.Equals, router.ErrCNameNotAllowed)
-	err = s.Router.RemoveBackend(name)
+	err = cnameRouter.RemoveBackend(name)
 	c.Assert(err, check.IsNil)
 }
 
 func (s *RouterSuite) TestRemoveBackendWithCName(c *check.C) {
+	cnameRouter, ok := s.Router.(router.CNameRouter)
+	if !ok {
+		c.Skip(fmt.Sprintf("%T does not implement CNameRouter", s.Router))
+	}
 	name := "backend1"
-	err := s.Router.AddBackend(name)
+	err := cnameRouter.AddBackend(name)
 	c.Assert(err, check.IsNil)
 	addr1, err := url.Parse("http://10.10.10.10:8080")
 	c.Assert(err, check.IsNil)
-	err = s.Router.AddRoute(name, addr1)
+	err = cnameRouter.AddRoute(name, addr1)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.RemoveBackend(name)
+	err = cnameRouter.RemoveBackend(name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.AddBackend(name)
+	err = cnameRouter.AddBackend(name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.SetCName("my.host.com", name)
+	err = cnameRouter.SetCName("my.host.com", name)
 	c.Assert(err, check.IsNil)
-	err = s.Router.RemoveBackend(name)
+	err = cnameRouter.RemoveBackend(name)
 	c.Assert(err, check.IsNil)
 }
 
