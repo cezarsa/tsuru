@@ -120,6 +120,7 @@ type App struct {
 	Plan           Plan
 	Pool           string
 	Description    string
+	RouterOpts     map[string]string
 
 	quota.Quota
 }
@@ -127,6 +128,10 @@ type App struct {
 // Units returns the list of units.
 func (app *App) Units() ([]provision.Unit, error) {
 	return Provisioner.Units(app)
+}
+
+func (app *App) GetRouterOpts() map[string]string {
+	return app.RouterOpts
 }
 
 // MarshalJSON marshals the app in json format.
@@ -1586,7 +1591,11 @@ func (app *App) RebuildRoutes() (*RebuildRoutesResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = r.AddBackend(app.Name)
+	if optsRouter, ok := r.(router.OptsRouter); ok {
+		err = optsRouter.AddBackendOpts(app.Name, app.RouterOpts)
+	} else {
+		err = r.AddBackend(app.Name)
+	}
 	if err != nil && err != router.ErrBackendExists {
 		return nil, err
 	}
