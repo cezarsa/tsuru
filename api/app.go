@@ -1713,6 +1713,37 @@ func isDeployAgentUA(r *http.Request) bool {
 		strings.HasPrefix(ua, "tsuru-deploy-agent")
 }
 
+// title: unregister unit
+// path: /apps/{app}/units/{unit}
+// method: DELETE
+// produce: application/json
+// responses:
+//   200: Ok
+//   401: Unauthorized
+//   404: App or unit not found
+func unregisterUnit(w http.ResponseWriter, r *http.Request, t auth.Token) error {
+	appName := r.URL.Query().Get(":app")
+	unit := r.URL.Query().Get(":unit")
+	a, err := app.GetByName(appName)
+	if err != nil {
+		return err
+	}
+	allowed := permission.Check(t, permission.PermAppUpdateUnitUnregister,
+		contextsForApp(a)...,
+	)
+	if !allowed {
+		return permission.ErrUnauthorized
+	}
+	err = a.UnregisterUnit(unit)
+	if err != nil {
+		if err, ok := err.(*provision.UnitNotFoundError); ok {
+			return &errors.HTTP{Code: http.StatusNotFound, Message: err.Error()}
+		}
+		return err
+	}
+	return nil
+}
+
 // title: register unit
 // path: /apps/{app}/units/register
 // method: POST

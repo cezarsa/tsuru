@@ -569,19 +569,21 @@ func (p *kubernetesProvisioner) addressesForApp(client *ClusterClient, a provisi
 	if err != nil {
 		return nil, err
 	}
+	nodeInformer, err := p.nodeInformerForCluster(client)
+	if err != nil {
+		return nil, err
+	}
 	addrs := make([]url.URL, 0)
-	for _, p := range pods {
-		allReady := true
-		for _, contStatus := range p.Status.ContainerStatuses {
-			if !contStatus.Ready {
-				allReady = false
-				break
+	for _, pod := range pods {
+		if isPodReady(&pod) {
+			node, err := nodeInformer.Lister().Get(pod.Spec.NodeName)
+			if err != nil {
+				return nil, err
 			}
-		}
-		if allReady {
+			wrapper := kubernetesNodeWrapper{node: node, prov: p}
 			addrs = append(addrs, url.URL{
 				Scheme: "http",
-				Host:   fmt.Sprintf("%s:%d", p.Status.HostIP, pubPort),
+				Host:   fmt.Sprintf("%s:%d", wrapper.Address(), pubPort),
 			})
 		}
 	}
@@ -608,6 +610,57 @@ func (p *kubernetesProvisioner) addressesForPool(client *ClusterClient, poolName
 		}
 	}
 	return addrs, nil
+}
+
+func (p *kubernetesProvisioner) UnregisterUnit(a provision.App, unitID string) error {
+	client, err := clusterForPool(a.GetPool())
+	if err != nil {
+		return err
+	}
+	informer, err := p.podInformerForCluster(client)
+	if err != nil {
+		return err
+	}
+	ns, err := client.AppNamespace(a)
+	if err != nil {
+		return err
+	}
+	pod, err := informer.Lister().Pods(ns).Get(unitID)
+	if err != nil {
+		return err
+	}
+	labelSet := labelSetFromMeta(&pod.ObjectMeta)
+	process := labelSet.AppProcess()
+	depLabelSet, err := deploymentLabels(client, a, process)
+	if err != nil {
+		return err
+	}
+	timeout := time.After(time.Duration(defaultGracePeriodSeconds) * time.Second)
+	var routerReadyCount int
+	// FIXME(cezarsa): Today maxUnavailable is hardcoded to 0 on created
+	// deployments. If it becomes configurable in the future this logic must
+	// change accordingly.
+	for routerReadyCount < depLabelSet.AppReplicas() {
+		select {
+		case <-time.After(200 * time.Millisecond):
+		case <-timeout:
+			return errors.New("timeout waiting for router ready pods")
+		}
+		appPods, err := p.podsForApps(client, []provision.App{a})
+		if err != nil {
+			return err
+		}
+		routerReadyCount = 0
+		for _, p := range appPods {
+			if p.Name == unitID {
+				continue
+			}
+			if _, ok := p.Annotations[routerReadyAnnotation]; ok {
+				routerReadyCount++
+			}
+		}
+	}
+	return nil
 }
 
 func (p *kubernetesProvisioner) RegisterUnit(a provision.App, unitID string, customData map[string]interface{}) error {

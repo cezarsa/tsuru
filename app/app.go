@@ -2119,6 +2119,17 @@ func (app *App) GetUpdatePlatform() bool {
 	return app.UpdatePlatform
 }
 
+func (app *App) UnregisterUnit(unitId string) error {
+	prov, err := app.getProvisioner()
+	if err != nil {
+		return err
+	}
+	if up, ok := prov.(provision.UnregisterableProvisioner); ok {
+		return up.UnregisterUnit(app, unitId)
+	}
+	return nil
+}
+
 func (app *App) RegisterUnit(unitId string, customData map[string]interface{}) error {
 	prov, err := app.getProvisioner()
 	if err != nil {

@@ -371,7 +371,7 @@ func registryAuth(img string) (username, password, imgDomain string) {
 	return username, password, imgDomain
 }
 
-func extraRegisterCmds(a provision.App) string {
+func tsuruHostToken(a provision.App) (string, string) {
 	host, _ := config.GetString("host")
 	if !strings.HasPrefix(host, "http") {
 		host = "http://" + host
@@ -380,6 +380,11 @@ func extraRegisterCmds(a provision.App) string {
 		host += "/"
 	}
 	token := a.Envs()["TSURU_APP_TOKEN"].Value
+	return host, token
+}
+
+func extraRegisterCmds(a provision.App) string {
+	host, token := tsuruHostToken(a)
 	return fmt.Sprintf(`curl -sSL -m15 -XPOST -d"hostname=$(hostname)" -o/dev/null -H"Content-Type:application/x-www-form-urlencoded" -H"Authorization:bearer %s" %sapps/%s/units/register || true`, token, host, a.GetName())
 }
 
@@ -507,6 +512,18 @@ func ensureServiceAccountForApp(client *ClusterClient, a provision.App) error {
 	return ensureServiceAccount(client, serviceAccountNameForApp(a), labels, ns)
 }
 
+func createPreStopHook(a provision.App) *apiv1.Handler {
+	host, token := tsuruHostToken(a)
+	curlCmd := fmt.Sprintf(`curl -sSL -m120 -XDELETE -o/dev/null -H"Authorization:bearer %s" %sapps/%s/units/$(hostname)`, token, host, a.GetName())
+	return &apiv1.Handler{
+		Exec: &apiv1.ExecAction{
+			Command: []string{
+				"/bin/sh", "-c", curlCmd,
+			},
+		},
+	}
+}
+
 func createAppDeployment(client *ClusterClient, oldDeployment *v1beta2.Deployment, a provision.App, process, imageName string, replicas int, labels *provision.LabelSet) (*v1beta2.Deployment, *provision.LabelSet, *provision.LabelSet, error) {
 	provision.ExtendServiceLabels(labels, provision.ServiceLabelExtendedOpts{
 		Provisioner: provisionerName,
@@ -602,6 +619,10 @@ func createAppDeployment(client *ClusterClient, oldDeployment *v1beta2.Deploymen
 	if policyLocal {
 		// Grace period must be larger to account for the the pre-stop hook call
 		gracePeriod = &defaultGracePeriodSeconds
+		if lifecycle == nil {
+			lifecycle = &apiv1.Lifecycle{}
+		}
+		lifecycle.PreStop = createPreStopHook(a)
 	}
 	deployment := v1beta2.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -705,13 +726,13 @@ func (m *serviceManager) RemoveService(a provision.App, process string) error {
 	return multiErrors.ToError()
 }
 
-func (m *serviceManager) CurrentLabels(a provision.App, process string) (*provision.LabelSet, error) {
+func deploymentLabels(client *ClusterClient, a provision.App, process string) (*provision.LabelSet, error) {
 	depName := deploymentNameForApp(a, process)
-	ns, err := m.client.AppNamespace(a)
+	ns, err := client.AppNamespace(a)
 	if err != nil {
 		return nil, err
 	}
-	dep, err := m.client.AppsV1beta2().Deployments(ns).Get(depName, metav1.GetOptions{})
+	dep, err := client.AppsV1beta2().Deployments(ns).Get(depName, metav1.GetOptions{})
 	if err != nil {
 		if k8sErrors.IsNotFound(err) {
 			return nil, nil
@@ -719,6 +740,10 @@ func (m *serviceManager) CurrentLabels(a provision.App, process string) (*provis
 		return nil, errors.WithStack(err)
 	}
 	return labelSetFromMeta(&dep.ObjectMeta), nil
+}
+
+func (m *serviceManager) CurrentLabels(a provision.App, process string) (*provision.LabelSet, error) {
+	return deploymentLabels(m.client, a, process)
 }
 
 const deadlineExeceededProgressCond = "ProgressDeadlineExceeded"

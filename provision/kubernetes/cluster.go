@@ -136,11 +136,13 @@ func NewClusterClient(clust *provTypes.Cluster) (*ClusterClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ClusterClient{
+	clusterClient := &ClusterClient{
 		Cluster:    clust,
 		Interface:  client,
 		restConfig: cfg,
-	}, nil
+	}
+	startMonitoring(mainKubernetesProvisioner, clusterClient)
+	return clusterClient, nil
 }
 
 func (c *ClusterClient) SetTimeout(timeout time.Duration) error {

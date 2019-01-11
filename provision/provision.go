@@ -733,3 +733,7 @@ func IsStartupError(err error) bool {
 	})
 	return ok && se.IsStartupError()
 }
+
+type UnregisterableProvisioner interface {
+	UnregisterUnit(app App, unitId string) error
+}

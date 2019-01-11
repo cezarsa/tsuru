@@ -1,7 +1,7 @@
 // AUTOMATICALLY GENERATED FILE - DO NOT EDIT!
 // Please run 'go generate' to update this file.
 //
-// Copyright 2018 tsuru authors. All rights reserved.
+// Copyright 2019 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -75,6 +75,7 @@ var (
 	PermAppUpdateUnitRegister            = PermissionRegistry.get("app.update.unit.register")            // [global app team pool]
 	PermAppUpdateUnitRemove              = PermissionRegistry.get("app.update.unit.remove")              // [global app team pool]
 	PermAppUpdateUnitStatus              = PermissionRegistry.get("app.update.unit.status")              // [global app team pool]
+	PermAppUpdateUnitUnregister          = PermissionRegistry.get("app.update.unit.unregister")          // [global app team pool]
 	PermCluster                          = PermissionRegistry.get("cluster")                             // [global]
 	PermClusterCreate                    = PermissionRegistry.get("cluster.create")                      // [global]
 	PermClusterDelete                    = PermissionRegistry.get("cluster.delete")                      // [global]

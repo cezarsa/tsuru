@@ -228,6 +228,10 @@ func RunServer(dry bool) http.Handler {
 	m.Add("1.0", "Post", "/apps/{app}/units/register", registerUnitHandler)
 	setUnitStatusHandler := AuthorizationRequiredHandler(setUnitStatus)
 	m.Add("1.0", "Post", "/apps/{app}/units/{unit}", setUnitStatusHandler)
+
+	unregisterUnitHandler := AuthorizationRequiredHandler(unregisterUnit)
+	m.Add("1.7", "Delete", "/apps/{app}/units/{unit}", unregisterUnitHandler)
+
 	m.Add("1.0", "Put", "/apps/{app}/teams/{team}", AuthorizationRequiredHandler(grantAppAccess))
 	m.Add("1.0", "Delete", "/apps/{app}/teams/{team}", AuthorizationRequiredHandler(revokeAppAccess))
 	m.Add("1.0", "Get", "/apps/{app}/log", AuthorizationRequiredHandler(appLog))
@@ -479,6 +483,7 @@ func RunServer(dry bool) http.Handler {
 		registerUnitHandler,
 		setUnitStatusHandler,
 		diffDeployHandler,
+		unregisterUnitHandler,
 	}})
 	n.UseHandler(http.HandlerFunc(runDelayedHandler))
 
