@@ -1203,20 +1203,20 @@ func (p *kubernetesProvisioner) internalNodeUpdate(opts provision.UpdateNodeOpti
 	return errors.WithStack(err)
 }
 
-func (p *kubernetesProvisioner) Deploy(args provision.DeployArgs) (string, error) {
+func (p *kubernetesProvisioner) Deploy(args provision.DeployArgs) (appTypes.AppVersion, error) {
 	client, err := clusterForPool(args.App.GetPool())
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err = ensureAppCustomResourceSynced(client, args.App); err != nil {
-		return "", err
+		return nil, err
 	}
 	if args.Version.VersionInfo().DeployImage == "" {
 		deployPodName := deployPodNameForApp(args.App, args.Version)
 		ns, nsErr := client.AppNamespace(args.App)
 		if nsErr != nil {
-			return "", nsErr
+			return nil, nsErr
 		}
 		defer cleanupPod(client, deployPodName, ns)
 		params := createPodParams{
@@ -1233,11 +1233,11 @@ func (p *kubernetesProvisioner) Deploy(args provision.DeployArgs) (string, error
 		err = createDeployPod(ctx, params)
 		cancel()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		err = args.Version.CommitBaseImage()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 	manager := &serviceManager{
@@ -1248,18 +1248,18 @@ func (p *kubernetesProvisioner) Deploy(args provision.DeployArgs) (string, error
 	if !args.PreserveVersions {
 		oldVersion, err = baseVersionForApp(client, args.App)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 	err = servicecommon.RunServicePipeline(manager, oldVersion, args, nil)
 	if err != nil {
-		return "", errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 	err = ensureAppCustomResourceSynced(client, args.App)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return args.Version.VersionInfo().DeployImage, nil
+	return args.Version, nil
 }
 
 func (p *kubernetesProvisioner) UpgradeNodeContainer(name string, pool string, writer io.Writer) error {

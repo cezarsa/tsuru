@@ -865,15 +865,15 @@ func (p *FakeProvisioner) Swap(app1, app2 provision.App, cnameOnly bool) error {
 	return routertest.FakeRouter.Swap(app1.GetName(), app2.GetName(), cnameOnly)
 }
 
-func (p *FakeProvisioner) Deploy(args provision.DeployArgs) (string, error) {
+func (p *FakeProvisioner) Deploy(args provision.DeployArgs) (appTypes.AppVersion, error) {
 	if err := p.getError("Deploy"); err != nil {
-		return "", err
+		return nil, err
 	}
 	p.mut.Lock()
 	defer p.mut.Unlock()
 	pApp, ok := p.apps[args.App.GetName()]
 	if !ok {
-		return "", errNotProvisioned
+		return nil, errNotProvisioned
 	}
 	if args.Version.VersionInfo().DeployImage != "" {
 		pApp.image = args.Version.VersionInfo().DeployImage
@@ -884,13 +884,13 @@ func (p *FakeProvisioner) Deploy(args provision.DeployArgs) (string, error) {
 	p.apps[args.App.GetName()] = pApp
 	err := args.Version.CommitBaseImage()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	err = args.Version.CommitSuccessful()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return args.Version.VersionInfo().DeployImage, nil
+	return args.Version, nil
 }
 
 func (p *FakeProvisioner) GetClient(app provision.App) (provision.BuilderDockerClient, error) {

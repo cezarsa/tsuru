@@ -354,27 +354,27 @@ func (p *dockerProvisioner) Sleep(app provision.App, process string, _ appTypes.
 	}, nil, true)
 }
 
-func (p *dockerProvisioner) Deploy(args provision.DeployArgs) (string, error) {
+func (p *dockerProvisioner) Deploy(args provision.DeployArgs) (appTypes.AppVersion, error) {
 	if args.PreserveVersions {
-		return "", errors.New("docker provisioner does not support multiple versions")
+		return nil, errors.New("docker provisioner does not support multiple versions")
 	}
 	if args.Version.VersionInfo().DeployImage != "" {
 		err := p.deploy(args.App, args.Version, args.Event)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return args.Version.VersionInfo().DeployImage, nil
+		return args.Version, nil
 	}
 	cmds := dockercommon.DeployCmds(args.App)
-	imageID, err := p.deployPipeline(args.App, args.Version, cmds, args.Event)
+	newVersion, err := p.deployPipeline(args.App, args.Version, cmds, args.Event)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	err = p.deploy(args.App, args.Version, args.Event)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return imageID, nil
+	return newVersion, nil
 }
 
 func (p *dockerProvisioner) deploy(a provision.App, version appTypes.AppVersion, evt *event.Event) error {

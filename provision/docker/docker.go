@@ -47,7 +47,7 @@ func randomString() string {
 	return fmt.Sprintf("%x", h.Sum(nil))[:20]
 }
 
-func (p *dockerProvisioner) deployPipeline(app provision.App, version appTypes.AppVersion, commands []string, evt *event.Event) (string, error) {
+func (p *dockerProvisioner) deployPipeline(app provision.App, version appTypes.AppVersion, commands []string, evt *event.Event) (appTypes.AppVersion, error) {
 	actions := []*action.Action{
 		&insertEmptyContainerInDB,
 		&createContainer,
@@ -75,9 +75,9 @@ func (p *dockerProvisioner) deployPipeline(app provision.App, version appTypes.A
 	err := container.RunPipelineWithRetry(pipeline, args)
 	if err != nil {
 		log.Errorf("error on execute deploy pipeline for app %s - %s", app.GetName(), err)
-		return "", err
+		return nil, err
 	}
-	return version.VersionInfo().DeployImage, nil
+	return version, nil
 }
 
 func (p *dockerProvisioner) start(oldContainer *container.Container, app provision.App, cmdData dockercommon.ContainerCmdsData, version appTypes.AppVersion, w io.Writer, destinationHosts ...string) (*container.Container, error) {

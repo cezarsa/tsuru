@@ -297,7 +297,7 @@ type DeployArgs struct {
 
 // BuilderDeploy is a provisioner that allows deploy builded image.
 type BuilderDeploy interface {
-	Deploy(DeployArgs) (string, error)
+	Deploy(DeployArgs) (appTypes.AppVersion, error)
 }
 
 type BuilderDeployDockerClient interface {

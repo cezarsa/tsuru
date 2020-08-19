@@ -20,6 +20,7 @@ import (
 	"github.com/tsuru/tsuru/event"
 	tsuruIo "github.com/tsuru/tsuru/io"
 	"github.com/tsuru/tsuru/permission"
+	appTypes "github.com/tsuru/tsuru/types/app"
 )
 
 // title: app build
@@ -83,15 +84,24 @@ func build(w http.ResponseWriter, r *http.Request, t auth.Token) (err error) {
 	if err != nil {
 		return err
 	}
-	var imageID string
-	defer func() { evt.DoneCustomData(err, map[string]string{"image": imageID}) }()
+	var newVersion appTypes.AppVersion
+	defer func() {
+		var result map[string]interface{}
+		if newVersion != nil {
+			result = map[string]interface{}{
+				"image":   newVersion.VersionInfo().BuildImage,
+				"version": newVersion.Version(),
+			}
+		}
+		evt.DoneCustomData(err, result)
+	}()
 	opts.Event = evt
 	writer := tsuruIo.NewKeepAliveWriter(w, 30*time.Second, "please wait...")
 	defer writer.Stop()
 	opts.OutputStream = writer
-	imageID, err = app.Build(opts)
+	newVersion, err = app.Build(opts)
 	if err == nil {
-		fmt.Fprintln(w, imageID)
+		fmt.Fprintln(w, newVersion.VersionInfo().BuildImage)
 		fmt.Fprintln(w, "OK")
 	}
 	return err

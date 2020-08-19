@@ -215,9 +215,9 @@ func (o *DeployOptions) GetKind() (kind DeployKind) {
 	return DeployArchiveURL
 }
 
-func Build(opts DeployOptions) (string, error) {
+func Build(opts DeployOptions) (appTypes.AppVersion, error) {
 	if opts.Event == nil {
-		return "", errors.Errorf("missing event in build opts")
+		return nil, errors.Errorf("missing event in build opts")
 	}
 	logWriter := LogWriter{AppName: opts.App.Name}
 	logWriter.Async()
@@ -225,24 +225,20 @@ func Build(opts DeployOptions) (string, error) {
 	opts.Event.SetLogWriter(io.MultiWriter(&tsuruIo.NoErrorWriter{Writer: opts.OutputStream}, &logWriter))
 	prov, err := opts.App.getProvisioner()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if opts.App.GetPlatform() == "" {
-		return "", errors.Errorf("can't build app without platform")
+		return nil, errors.Errorf("can't build app without platform")
 	}
 	builder, ok := prov.(provision.BuilderDeploy)
 	if !ok {
-		return "", errors.Errorf("provisioner don't implement builder interface")
+		return nil, errors.Errorf("provisioner don't implement builder interface")
 	}
 	version, err := builderDeploy(builder, &opts, opts.Event)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	vi := version.VersionInfo()
-	if vi.DeployImage != "" {
-		return vi.DeployImage, nil
-	}
-	return vi.BuildImage, nil
+	return version, nil
 }
 
 type errorWithLog struct {
@@ -312,30 +308,30 @@ func validateVersions(opts DeployOptions) error {
 // Deploy runs a deployment of an application. It will first try to run an
 // archive based deploy (if opts.ArchiveURL is not empty), and then fallback to
 // the Git based deployment.
-func Deploy(opts DeployOptions) (string, error) {
+func Deploy(opts DeployOptions) (appTypes.AppVersion, error) {
 	if opts.Event == nil {
-		return "", errors.Errorf("missing event in deploy opts")
+		return nil, errors.Errorf("missing event in deploy opts")
 	}
 	err := validateVersions(opts)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	logWriter := LogWriter{AppName: opts.App.Name}
 	logWriter.Async()
 	defer logWriter.Close()
 	opts.Event.SetLogWriter(io.MultiWriter(&tsuruIo.NoErrorWriter{Writer: opts.OutputStream}, &logWriter))
-	imageID, err := deployToProvisioner(&opts, opts.Event)
+	newVersion, err := deployToProvisioner(&opts, opts.Event)
 	rebuild.RoutesRebuildOrEnqueueWithProgress(opts.App.Name, opts.Event)
 	quotaErr := opts.App.fixQuota()
 	if quotaErr != nil {
 		log.Errorf("WARNING: unable to ensure quota is up-to-date after deploy: %v", quotaErr)
 	}
 	if err != nil {
-		return "", newErrorWithLog(err, opts.App, "deploy")
+		return nil, newErrorWithLog(err, opts.App, "deploy")
 	}
 	err = incrementDeploy(opts.App)
 	if err != nil {
-		log.Errorf("WARNING: couldn't increment deploy count, deploy opts: %#v", opts)
+		log.Errorf("WARNING: couldn't increment deploy count, deploy opts: %#v: err: %v", opts, err)
 	}
 	if opts.Kind == DeployImage || opts.Kind == DeployRollback {
 		if !opts.App.UpdatePlatform {
@@ -344,7 +340,7 @@ func Deploy(opts DeployOptions) (string, error) {
 	} else if opts.App.UpdatePlatform {
 		opts.App.SetUpdatePlatform(false)
 	}
-	return imageID, nil
+	return newVersion, nil
 }
 
 func RollbackUpdate(app *App, imageID, reason string, disableRollback bool) error {
@@ -355,39 +351,39 @@ func RollbackUpdate(app *App, imageID, reason string, disableRollback bool) erro
 	return version.ToggleEnabled(!disableRollback, reason)
 }
 
-func deployToProvisioner(opts *DeployOptions, evt *event.Event) (string, error) {
+func deployToProvisioner(opts *DeployOptions, evt *event.Event) (appTypes.AppVersion, error) {
 	prov, err := opts.App.getProvisioner()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if opts.Kind == "" {
 		opts.GetKind()
 	}
 	if opts.App.GetPlatform() == "" && opts.Kind != DeployImage && opts.Kind != DeployRollback {
-		return "", errors.Errorf("can't deploy app without platform, if it's not an image or rollback")
+		return nil, errors.Errorf("can't deploy app without platform, if it's not an image or rollback")
 	}
 
 	deployer, ok := prov.(provision.BuilderDeploy)
 	if !ok {
-		return "", provision.ProvisionerNotSupported{Prov: prov, Action: fmt.Sprintf("%s deploy", opts.Kind)}
+		return nil, provision.ProvisionerNotSupported{Prov: prov, Action: fmt.Sprintf("%s deploy", opts.Kind)}
 	}
 
 	var version appTypes.AppVersion
 	if opts.Kind == DeployRollback {
 		version, err = servicemanager.AppVersion.VersionByImageOrVersion(opts.App, opts.Image)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		versionInfo := version.VersionInfo()
 		if versionInfo.MarkedToRemoval {
-			return "", appTypes.ErrVersionMarkedToRemoval
+			return nil, appTypes.ErrVersionMarkedToRemoval
 		} else if versionInfo.Disabled {
-			return "", errors.Errorf("the selected version is disabled for rollback: %s", version.VersionInfo().DisabledReason)
+			return nil, errors.Errorf("the selected version is disabled for rollback: %s", version.VersionInfo().DisabledReason)
 		}
 	} else {
 		version, err = builderDeploy(deployer, opts, evt)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 	return deployer.Deploy(provision.DeployArgs{

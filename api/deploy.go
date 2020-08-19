@@ -18,6 +18,7 @@ import (
 	tsuruIo "github.com/tsuru/tsuru/io"
 	"github.com/tsuru/tsuru/permission"
 	"github.com/tsuru/tsuru/repository"
+	appTypes "github.com/tsuru/tsuru/types/app"
 )
 
 const eventIDHeader = "X-Tsuru-Eventid"
@@ -96,7 +97,7 @@ func deploy(w http.ResponseWriter, r *http.Request, t auth.Token) (err error) {
 			return &tsuruErrors.HTTP{Code: http.StatusForbidden, Message: "User does not have permission to do this action in this app"}
 		}
 	}
-	var imageID string
+	var newVersion appTypes.AppVersion
 	evt, err := event.New(&event.Opts{
 		Target:        appTarget(appName),
 		Kind:          permission.PermAppDeploy,
@@ -109,13 +110,22 @@ func deploy(w http.ResponseWriter, r *http.Request, t auth.Token) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() { evt.DoneCustomData(err, map[string]string{"image": imageID}) }()
+	defer func() {
+		var result map[string]interface{}
+		if newVersion != nil {
+			result = map[string]interface{}{
+				"image":   newVersion.VersionInfo().DeployImage,
+				"version": newVersion.Version(),
+			}
+		}
+		evt.DoneCustomData(err, result)
+	}()
 	w.Header().Set(eventIDHeader, evt.UniqueID.Hex())
 	opts.Event = evt
 	writer := tsuruIo.NewKeepAliveWriter(w, 30*time.Second, "please wait...")
 	defer writer.Stop()
 	opts.OutputStream = writer
-	imageID, err = app.Deploy(opts)
+	newVersion, err = app.Deploy(opts)
 	if err == nil {
 		fmt.Fprintln(w, "\nOK")
 	}
@@ -226,7 +236,7 @@ func deployRollback(w http.ResponseWriter, r *http.Request, t auth.Token) error 
 	if !canRollback {
 		return &tsuruErrors.HTTP{Code: http.StatusForbidden, Message: permission.ErrUnauthorized.Error()}
 	}
-	var imageID string
+	var newVersion appTypes.AppVersion
 	evt, err := event.New(&event.Opts{
 		Target:        appTarget(appName),
 		Kind:          permission.PermAppDeploy,
@@ -239,9 +249,18 @@ func deployRollback(w http.ResponseWriter, r *http.Request, t auth.Token) error 
 	if err != nil {
 		return err
 	}
-	defer func() { evt.DoneCustomData(err, map[string]string{"image": imageID}) }()
+	defer func() {
+		var result map[string]interface{}
+		if newVersion != nil {
+			result = map[string]interface{}{
+				"image":   newVersion.VersionInfo().DeployImage,
+				"version": newVersion.Version(),
+			}
+		}
+		evt.DoneCustomData(err, result)
+	}()
 	opts.Event = evt
-	imageID, err = app.Deploy(opts)
+	newVersion, err = app.Deploy(opts)
 	if err != nil {
 		return err
 	}
@@ -348,7 +367,7 @@ func deployRebuild(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	if !canDeploy {
 		return &tsuruErrors.HTTP{Code: http.StatusForbidden, Message: permission.ErrUnauthorized.Error()}
 	}
-	var imageID string
+	var newVersion appTypes.AppVersion
 	evt, err := event.New(&event.Opts{
 		Target:        appTarget(appName),
 		Kind:          permission.PermAppDeploy,
@@ -361,9 +380,18 @@ func deployRebuild(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	if err != nil {
 		return err
 	}
-	defer func() { evt.DoneCustomData(err, map[string]string{"image": imageID}) }()
+	defer func() {
+		var result map[string]interface{}
+		if newVersion != nil {
+			result = map[string]interface{}{
+				"image":   newVersion.VersionInfo().DeployImage,
+				"version": newVersion.Version(),
+			}
+		}
+		evt.DoneCustomData(err, result)
+	}()
 	opts.Event = evt
-	imageID, err = app.Deploy(opts)
+	newVersion, err = app.Deploy(opts)
 	if err != nil {
 		return err
 	}
